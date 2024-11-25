@@ -1,8 +1,11 @@
-function [cfg, artifact] = ft_badsegment(cfg, data)
+function [data] = ft_baddata(cfg, data)
 
-% FT_BADSEGMENT tries to identify bad segments or trials in a MEG or EEG dataset.
-% Different methods are implemented to identify bad channels, these are largely
-% shared with those implemented in FT_REJECTVISUAL with the summary method.
+% FT_BADDATA identifies bad data in a MEG or EEG dataset by looping over all trials
+% and all channels. Each channel in each trial is considered separately, in the
+% remainder of the help we will refer to this as "traces". Different methods are
+% implemented, these are largely shared with those implemented in FT_REJECTVISUAL
+% with the "summary" method. The methods are shortly described in detail below. Bad
+% traces are replaced in the output data with nan.
 %
 % VAR, STD, MIN, MAX, MAXABS, RANGE, KURTOSIS, ZVALUE - compute the specified metric
 % for each channel in each trial and check whether it exceeds the threshold.
@@ -12,23 +15,14 @@ function [cfg, artifact] = ft_badsegment(cfg, data)
 % explained variance. A value close to 1 means that a channel is similar to its
 % neighbours, a value close to 0 indicates a "bad" channel.
 %
-% NEIGHBCORR - identifies channels that have low correlation with each of their
-% neighbours. The rationale is that "bad" channel have inherent noise that is
-% uncorrelated with other sensors.
-%
-% NEIGHBSTDRATIO - identifies channels that have a standard deviation which is very
-% different from that of each of their neighbours. This computes the difference in
-% the standard deviation of each channel to each of its neighbours, relative to that
-% of the neighbours.
-%
 % Use as
-%   [cfg, artifact] = ft_badchannel(cfg, data)
+%   [data_clean] = ft_baddata(cfg, data)
 % where the input data corresponds to the output from FT_PREPROCESSING.
 %
 % The configuration should contain
 %   cfg.metric        = string, describes the metric that should be computed in summary mode for each channel in each trial, can be
-%                       'var'          variance within each channel (default)
-%                       'std'          standard deviation within each channel
+%                       'var'          variance within each channel  (default)
+%                       'std'          standard deviation within each channel 
 %                       'db'           decibel value within each channel
 %                       'mad'          median absolute deviation within each channel
 %                       '1/var'        inverse variance within each channel
@@ -36,38 +30,22 @@ function [cfg, artifact] = ft_badsegment(cfg, data)
 %                       'max'          maximum value in each channel
 %                       'maxabs'       maximum absolute value in each channel
 %                       'range'        range from min to max in each channel
-%                       'kurtosis'     kurtosis, i.e. measure of peakedness of the amplitude distribution
+%                       'kurtosis'     kurtosis, i.e. measure of peakedness of the amplitude distribution in trace
 %                       'zvalue'       mean and std computed over all time and trials, per channel
 %                       'neighbexpvar' relative variance explained by neighboring channels in each trial
-%   cfg.threshold     = scalar, the optimal value depends on the methods and on the data characteristics
-%   cfg.neighbours    = neighbourhood structure, see FT_PREPARE_NEIGHBOURS for details
-%   cfg.nbdetect      = 'any', 'most', 'all', 'median', see below (default = 'median')
+%   cfg.threshold     = scalar, the appropriate value depends on the data characteristics and the metric
 %   cfg.feedback      = 'yes' or 'no', whether to show an image of the neighbour values (default = 'no')
 %
 % The following options allow you to make a pre-selection
 %   cfg.channel     = Nx1 cell-array with selection of channels (default = 'all'), see FT_CHANNELSELECTION for details
 %   cfg.trials      = 'all' or a selection given as a 1xN vector (default = 'all')
 %
-% The 'neighcorrel' and 'neighstdratio' methods implement the bad channel detection
-% (more or less) according to the paper "Adding dynamics to the Human Connectome
-% Project with MEG", Larson-Prior et al. https://doi.org/10.1016/j.neuroimage.2013.05.056.
-%
-% Most methods compute a scalar value for each channel that can simply be
-% thresholded. The NEIGHBCORR and NEIGHBSTDRATIO compute a vector with a value for
-% each of the neighbour of a channel. The cfg.nbdetect option allows you to specify
-% whether you want to flag the channel as bad in case 'all' of its neighbours exceed
-% the threshold, if 'most' exceed the threshold, or if 'any' of them exceeds the
-% threshold. Note that when you specify 'any', then all channels neighbouring a bad
-% channel will also be marked as bad, since they all have at least one bad neighbour.
-% You can also specify 'median', in which case the threshold is applied to the median
-% value over neighbours.
-%
-% See also FT_BADCHANNEL, FT_BADDATA, FT_REJECTVISUAL, FT_REJECTARTIFACT
+% See also FT_BADCHANNEL, FT_BADSEGMENT, FT_REJECTVISUAL, FT_CHANNELREPAIR
 
 % Undocumented options
 %   cfg.thresholdside = above or below
 
-% Copyright (C) 2021-2024, Robert Oostenveld
+% Copyright (C) 2024, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -105,7 +83,7 @@ if ft_abort
 end
 
 % check if the input data is valid for this function
-data = ft_checkdata(data, 'datatype', 'raw', 'feedback', 'yes', 'hassampleinfo', 'yes');
+data = ft_checkdata(data, 'datatype', 'raw', 'feedback', 'yes');
 
 % check if the input cfg is valid for this function
 cfg = ft_checkconfig(cfg, 'forbidden',  {'channels', 'trial'}); % prevent accidental typos, see issue 1729
@@ -143,7 +121,6 @@ data   = ft_selectdata(tmpcfg, data);
 
 ntrl  = length(data.trial);
 nchan = length(data.label);
-badsegment = false(1, ntrl);
 
 if contains(cfg.metric, 'zvalue')
   % cellmean and cellstd (see FT_DENOISE_PCA) would work instead of for-loops, but they are too memory-intensive
@@ -171,75 +148,33 @@ else
   connectivity = [];
 end
 
+% compute the artifact value for each trial and each channel
+level = nan(nchan, ntrl);
 for trl=1:ntrl
-  % compute the artifact value for each channel in this trial
-  level = artifact_level(data.trial{trl}, cfg.metric, mval, sd, connectivity);
-  
-  if isvector(level)
-    % find channels with a value that exceeds the threshold
-    switch cfg.thresholdside
-      case 'below'
-        badsegment(trl) = any(level<cfg.threshold);
-      case 'above'
-        badsegment(trl) = any(level>cfg.threshold);
+  level(:,trl) = artifact_level(data.trial{trl}, cfg.metric, mval, sd, connectivity);
+end
+
+% find channels and trials with a value that exceeds the threshold
+switch cfg.thresholdside
+  case 'below'
+    bad = level<cfg.threshold;
+  case 'above'
+    bad = level>cfg.threshold;
+end
+
+ft_info('identified %d out of %d traces as bad (%.0f %%)\n', sum(bad(:)), length(bad(:)), 100*mean(bad(:)));
+
+for trl=1:ntrl
+  for chan=1:nchan
+    if bad(chan,trl)
+      data.trial{trl}(chan,:) = nan;
     end
-    
-  else
-    % identify channels with one of their neighbours values that exceeds the threshold
-    for chan=1:nchan
-      nblevel = level(chan,:);            % select this channel from the matrix
-      nblevel = nblevel(~isnan(nblevel)); % only select its actual neighbours
-      switch cfg.nbdetect
-        case 'all'
-          switch cfg.thresholdside
-            case 'below'
-              badsegment(trl) = badsegment(trl) | all(nblevel<cfg.threshold);
-            case 'above'
-              badsegment(trl) = badsegment(trl) | all(nblevel>cfg.threshold);
-          end % switch
-        case 'most'
-          switch cfg.thresholdside
-            case 'below'
-              badsegment(trl) = badsegment(trl) | most(nblevel<cfg.threshold);
-            case 'above'
-              badsegment(trl) = badsegment(trl) | most(nblevel>cfg.threshold);
-          end % switch
-        case 'any'
-          switch cfg.thresholdside
-            case 'below'
-              badsegment(trl) = badsegment(trl) | any(nblevel<cfg.threshold);
-            case 'above'
-              badsegment(trl) = badsegment(trl) | any(nblevel>cfg.threshold);
-          end % switch
-        case 'median'
-          switch cfg.thresholdside
-            case 'below'
-              badsegment(trl) = badsegment(trl) | nanmedian(nblevel,2)<cfg.threshold;
-            case 'above'
-              badsegment(trl) = badsegment(trl) | nanmedian(nblevel,2)>cfg.threshold;
-          end % switch
-        otherwise
-          ft_error('incorrect specification of cfg.nbdetect');
-      end
-    end % for each channel
-    
-  end % if isvector
-end % for each trial
-
-ft_info('identified %d out of %d trials as bad\n', sum(badsegment), length(badsegment));
-
-% keep track of bad segments
-% this format is consistent with that of other artifact detection functions
-artifact = data.sampleinfo(badsegment,:);
-cfg.artfctdef.badsegment.artifact = artifact;
+  end
+end
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble previous data
-ft_postamble provenance
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SUBFUNCTION
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function tf = most(x)
-tf = sum(x(:)==true)>(numel(x)/2);
+ft_postamble previous   data
+ft_postamble provenance data
+ft_postamble history    data
+ft_postamble savevar    data
