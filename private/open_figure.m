@@ -12,6 +12,7 @@ cfg.position    = ft_getopt(cfg, 'position'); % use the default position
 cfg.renderer    = ft_getopt(cfg, 'renderer'); % let MATLAB decide on the default
 cfg.figurename  = ft_getopt(cfg, 'figurename');
 cfg.title       = ft_getopt(cfg, 'title');
+cfg.interpreter = ft_getopt(cfg, 'interpreter', 'none');
 
 switch cfg.figure
   case {'new', 'yes'}
@@ -85,5 +86,5 @@ end
 
 if ~isempty(cfg.title)
   % this appears above the axes
-  title(cfg.title);
+  title(cfg.title, 'Interpreter', cfg.interpreter);
 end
