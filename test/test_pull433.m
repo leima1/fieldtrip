@@ -5,8 +5,9 @@ function test_pull433
 % DEPENDENCY
 % DATA private
 
-if ~ft_hastoolbox('optim', 1)
+if ~ft_hastoolbox('optim')
   warning('the OPTIM toolbox is not available, skipping this test');
+  return
 end
 
 cd(dccnpath('/project/3031000.02/test/pull433'));

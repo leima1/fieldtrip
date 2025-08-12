@@ -9,7 +9,7 @@ function [dataout] = ft_denoise_sss(cfg, datain)
 % where cfg is a configuration structure that contains
 %   cfg.channel          = Nx1 cell-array with selection of channels (default = 'all'), see FT_CHANNELSELECTION for details
 %   cfg.trials           = 'all' or a selection given as a 1xN vector (default = 'all')
-%   cfg.pertrial         = 'no', or 'yes', compute the temporal projection per trial (default = 'no')
+%   cfg.pertrial         = 'no', or 'yes', compute the temporal projection per trial (default = 'yes')
 %   cfg.demean           = 'yes', or 'no', demean the data per epoch (default = 'yes')
 %   cfg.updatesens       = 'yes', or 'no', update the sensor array with the spatial projector
 %   cfg.sss              = structure with parameters that determine the behavior of the algorithm
@@ -108,7 +108,7 @@ S       = sss_spatial(datain, options);
 
 % compute the temporal subspace projector and the clean the data
 ft_info('Computing the subspace projector based on signal correlations\n');
-options = keepfields(cfg.sss, {'chunksize', 'thr'});
+options = keepfields(cfg.sss, {'chunksize', 'thr' 'st_only'});
 options.SSS = S;
 datain = sss_temporal(datain, options);
 
@@ -247,6 +247,7 @@ Q       = [Qin Qout];
 %   [Q, sss_indices, nin] = basis_condition_adjustment(Q, nin, options.condition_threshold);
 % end
 if options.regularize==1
+  ft_warning('using regularization on the basis functions is experimental code, and not thoroughly tested, use at your own risk');
   % this is based on a heuristic that I got from the MNE-python
   % implementation, and is based on a snr estimate per harmonic basis
   % function. Some pruning is done to exclude the basis functions with the
@@ -268,7 +269,7 @@ if options.regularize==1
 elseif options.regularize==2
   kappa = ft_getopt(options, 'kappa', []);
   if isempty(kappa)
-    ft_error('kappa should be specified if options.regulariz==2');
+    ft_error('kappa should be specified if options.regularize==2');
   end
 
   % use (implicit) kappa truncated version of the Qin

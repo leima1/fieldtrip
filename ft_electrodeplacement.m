@@ -152,6 +152,7 @@ cfg.channel       = ft_getopt(cfg, 'channel',             []); % default will be
 cfg.elec          = ft_getopt(cfg, 'elec',                []); % use previously placed electrodes
 cfg.flip          = ft_getopt(cfg, 'flip',                []); % the default is set below
 cfg.renderer      = ft_getopt(cfg, 'renderer',      'opengl');
+cfg.figurename    = ft_getopt(cfg, 'figurename',    mfilename);
 % view options
 cfg.clim          = ft_getopt(cfg, 'clim',             [0 1]); % initial volume intensity limit voxels
 cfg.markerdist    = ft_getopt(cfg, 'markerdist',           5); % marker-slice distance view when ~global
@@ -249,7 +250,6 @@ switch cfg.method
     % this is an interactive method, start building the figure
 
     h = open_figure(keepfields(cfg, {'figure', 'position', 'visible', 'renderer', 'figurename', 'title'}));
-    set(h, 'Name', mfilename);
     set(h, 'Units', 'normalized');
     set(h, 'Color', [1 1 1]);
     set(h, 'MenuBar', 'none');
@@ -640,19 +640,19 @@ switch cfg.method
     lpa = cfg.fiducial.lpa;
     rpa = cfg.fiducial.rpa;
     if any(dist(headshape.pos, nas)<tolerance)
-      ft_warning('Nasion coincides with headshape vertex, addding random displacement of about %f %s', tolerance, headshape.unit);
+      ft_warning('Nasion coincides with headshape vertex, adding random displacement of about %f %s', tolerance, headshape.unit);
       nas = nas + tolerance*randn(1,3);
     end
     if any(dist(headshape.pos, ini)<tolerance)
-      ft_warning('Inion coincides with headshape vertex, addding random displacement of about %f %s', tolerance, headshape.unit);
+      ft_warning('Inion coincides with headshape vertex, adding random displacement of about %f %s', tolerance, headshape.unit);
       ini = ini + tolerance*randn(1,3);
     end
     if any(dist(headshape.pos, lpa)<tolerance)
-      ft_warning('LPA coincides with headshape vertex, addding random displacement of about %f %s', tolerance, headshape.unit);
+      ft_warning('LPA coincides with headshape vertex, adding random displacement of about %f %s', tolerance, headshape.unit);
       lpa = lpa + tolerance*randn(1,3);
     end
     if any(dist(headshape.pos, rpa)<tolerance)
-      ft_warning('RPA coincides with headshape vertex, addding random displacement of about %f %s', tolerance, headshape.unit);
+      ft_warning('RPA coincides with headshape vertex, adding random displacement of about %f %s', tolerance, headshape.unit);
       rpa = rpa + tolerance*randn(1,3);
     end
 
