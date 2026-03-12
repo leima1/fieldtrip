@@ -82,20 +82,16 @@ while ~completed && (timeout == 0 || toc(stopwatch)<timeout)
     
     % the stderr log file should be empty, otherwise it potentially indicates an error
     direrr = dir(logerr);
-    if ~exist(outputfile, 'file') && ~isempty(direrr) && direrr.bytes>0
-      fid = fopen(fullfile(curPwd, direrr.name), 'r');
-      stderr = fread(fid, [1 inf], 'char');
-      fclose(fid);
+    if ~isempty(direrr) && direrr.bytes>0
+      stderr = fileread(fullfile(curPwd, direrr.name));
     else
       stderr = '';
     end
     
     % the stdout log file can be used instead of the MATLAB diary
     dirout = dir(logout);
-    if ~exist(outputfile, 'file') && ~isempty(dirout) && dirout.bytes>0
-      fid = fopen(fullfile(curPwd, dirout.name), 'r');
-      stdout = fread(fid, [1 inf], 'char');
-      fclose(fid);
+    if ~isempty(dirout) && dirout.bytes>0
+      stdout = fileread(fullfile(curPwd, dirout.name));
     else
       stdout = '';
     end
@@ -114,12 +110,12 @@ while ~completed && (timeout == 0 || toc(stopwatch)<timeout)
     
   elseif timeout == 0
     % only check once, no waiting here
-    break;
+    break
     
   else
     % the job results have not arrived yet
     % wait a little bit and try again
-    pausejava(sleep);
+    pausejava(sleep)
     continue
   end
   
@@ -135,8 +131,8 @@ if completed
     else
       err = sprintf('Error in job execution');
     end
-    % use the stderr and stdout output rather than the MATLAB results
-    options = {'lasterr', err, 'diary', stdout};
+    % use the stderr rather than the MATLAB result
+    options = {'lasterr', err};
   elseif isempty(ft_getopt(options, 'lasterr'))
     fprintf('job %s returned, it required %s and %s on %s\n', jobid, print_tim(ft_getopt(options, 'timused', nan)), print_mem(ft_getopt(options, 'memused', nan)), ft_getopt(options, 'hostname', 'unknown'));
   end
@@ -144,7 +140,8 @@ if completed
   % look at the optional arguments
   warn        = ft_getopt(options, 'lastwarn');
   err         = ft_getopt(options, 'lasterr');
-  diarystring = ft_getopt(options, 'diary');
+  diarystring = ft_getopt(options, 'diary', stdout);
+  options     = ft_setopt(options, 'diary', diarystring);
   
   % if there is an error, it needs to be represented as a message string
   % and optionally also as a strucure for rethrowing
@@ -152,9 +149,9 @@ if completed
     if ischar(err)
       errmsg = err;
     elseif isstruct(err)
-      errmsg = err.message;
+      errmsg = sprintf('%s: %s', err.identifier, err.message);
     else
-      errmsg = err.message;
+      errmsg = sprintf('%s: %s', err.identifier, err.message);
       % convert the MEexception object into a structure to allow a rethrow further down in the code
       ws = warning('off', 'MATLAB:structOnObject');
       err = struct(err);
@@ -168,19 +165,19 @@ if completed
   if ~isempty(diarystring)
     if strcmp(diary, 'error') && ~isempty(err)
       fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
-      fprintf('%% an error was detected, the output of the remote execution follows \n');
+      fprintf('%% an error was detected (%s), the output of the remote execution follows\n', jobid);
       fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
       fprintf('%s', diarystring);
       separatorline = true;
     elseif strcmp(diary, 'warning') && ~isempty(warn)
       fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
-      fprintf('%% a warning was detected, the output of the remote execution follows\n');
+      fprintf('%% a warning was detected (%s), the output of the remote execution follows\n', jobid);
       fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
       fprintf('%s', diarystring);
       separatorline = true;
     elseif strcmp(diary, 'always')
       fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
-      fprintf('%% no problem was detected, the output of the remote execution follows\n');
+      fprintf('%% no problem was detected (%s), the output of the remote execution follows\n', jobid);
       fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
       fprintf('%s', diarystring);
       separatorline = true;
@@ -188,12 +185,12 @@ if completed
   end
   
   if ~isempty(warn)
-    fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
+    fprintf('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ WARNING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
     warning(warn);
   end
   
   if ~isempty(err)
-    fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
+    fprintf('################################# ERROR #####################################\n');
     if StopOnError
       if ischar(err)
         error(err);
@@ -201,12 +198,12 @@ if completed
         rethrow(err);
       end
     else
-      warning('error during remote execution: %s', errmsg);
+      warning('error during remote execution (%s):\n%s', jobid, errmsg);
     end
   end % ~isempty(err)
   
   if separatorline
-    fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
+    fprintf('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% END OF OUTPUT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n');
   end
   
   switch output
@@ -222,7 +219,7 @@ if completed
   end
   
 else
-  warning('FieldTrip:qsub:jobNotAvailable', 'the job results are not yet available');
+  warning('FieldTrip:qsub:jobNotAvailable', 'the job results (%s) are not yet available', jobid);
   switch output
     case 'varargout'
       % return empty output arguments

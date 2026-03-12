@@ -125,13 +125,13 @@ end
 iseeg = ft_senstype(sens, 'eeg');
 ismeg = ft_senstype(sens, 'meg');
 
-% determine the default for this option
+% set the default for reducing the rank of the leadfields
 if isempty(reducerank)
   if iseeg
     reducerank = 'no';    % for EEG
   elseif ismeg && ft_headmodeltype(headmodel, 'infinite')
     reducerank = 'no';    % for MEG with a magnetic dipole, e.g. a HPI coil
-  else
+  elseif ismeg
     reducerank = 'yes';   % for MEG with a current dipole in a volume conductor
   end
 end
@@ -340,19 +340,7 @@ elseif ismeg
       %TODO: involve unit checking -> not at this level
 
       % compute secondary leadfield numerically
-      lf = leadfield_duneuro(dippos, headmodel, 'meg');
-
-      % compute primary B-field analytically
-      % permeability constant mu in si units
-      mu = 4*pi*1e-7; %unit: Tm/A
-      
-      index = repmat(1:size(dippos,1),3,1);
-      index = index(:);
-      dipoles = [dippos(index,:) repmat(eye(3),size(dippos,1),1)];
-      Bp = compute_B_primary(sens.coilpos, dipoles, sens.coilori);
-
-      % compute full B-field
-      lf = mu/(4*pi) * (Bp - lf);
+      lf = leadfield_duneuro(dippos, headmodel, sens, 'meg');
 
       if isfield(sens, 'tra')
         % construct the channels from a linear combination of all magnetometer coils
@@ -519,7 +507,7 @@ elseif iseeg
       ft_hastoolbox('duneuro', 1);
 
       % note that the electrode information is contained in the headmodel
-      lf = leadfield_duneuro(dippos, headmodel, 'eeg');
+      lf = leadfield_duneuro(dippos, headmodel, sens, 'eeg');
 
     case 'metufem'
       p3 = zeros(Ndipoles * 3, 6);

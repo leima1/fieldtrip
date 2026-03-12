@@ -554,7 +554,12 @@ switch headerformat
 
     orig = openNSx(filename, 'noread');
     channelstype=regexp({orig.ElectrodesInfo.Label},'[A-Za-z]+','match','once');
-    chaninfo=table({orig.ElectrodesInfo.ElectrodeID}',...
+    if isfield(orig.ElectrodesInfo, 'ElectrodeID') % has been renamed into ChannelID
+      for i=1:numel(orig.ElectrodesInfo)
+        orig.ElectrodesInfo(i).ChannelID = orig.ElectrodesInfo(i).ElectrodeID;
+      end
+    end
+    chaninfo=table({orig.ElectrodesInfo.ChannelID}',...
       transpose(deblank({orig.ElectrodesInfo.Label})),[channelstype]',...
       {orig.ElectrodesInfo.ConnectorBank}',{orig.ElectrodesInfo.ConnectorPin}',...
       transpose(deblank({orig.ElectrodesInfo.AnalogUnits})),...
@@ -1927,14 +1932,25 @@ switch headerformat
     hdr.nChans      = info.nchan;
     hdr.Fs          = info.sfreq;
 
-    if ft_senstype(hdr, 'fieldline') && isempty(coilaccuracy)
-      ft_warning('FieldLine data requires a numeric value for coilaccuracy>=0');
+    if isempty(coilaccuracy) && (ft_senstype(hdr, 'fieldline') || ft_senstype(hdr, 'quspin_neuro1'))
+      ft_warning('OPM data requires a numeric value (0, 1, 2) for coilaccuracy');
       coilaccuracy = 0;
     end
 
     if ft_senstype(hdr, 'fieldline_v3')
       % default for FieldLine v3 is to remove the electronics chassis number from the channel names
       splitlabel = ft_getopt(varargin, 'splitlabel', true);
+    end
+
+    % allow FT_CHANTYPE to have a look in the original header details
+    hdr.orig = info;
+    hdr.chantype = ft_chantype(hdr);
+
+    if ft_senstype(hdr, 'quspin_neuro1')
+      sel = ismember(hdr.label, {'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10'});
+      hdr.chantype(sel) = {'digital trigger'}; % somehow these are marked as kind=501=misc in the fif file
+      sel = ismember(hdr.label, {'AI 0', 'AI 1', 'AI 2', 'AI 3', 'AI 4', 'AI 5', 'AI 6', 'AI 7', 'AI 8', 'AI 9', 'AI 10', 'AI 11', 'AI 12', 'AI 13', 'AI 14', 'AI 15'});
+      hdr.chantype(sel) = {'analog trigger'}; % somehow these are marked as kind=3=other trigger in the fif file
     end
 
     % add a gradiometer structure for forward and inverse modelling
@@ -2823,16 +2839,6 @@ end
 % as of November 2011, the header is supposed to include the channel type (see FT_CHANTYPE,
 % e.g. meggrad, megref, eeg) and the units of each channel (see FT_CHANUNIT, e.g. uV, fT)
 
-if ~isfield(hdr, 'chantype') && checkUniqueLabels
-  % use a helper function which has some built in intelligence
-  hdr.chantype = ft_chantype(hdr);
-end
-
-if ~isfield(hdr, 'chanunit') && checkUniqueLabels
-  % use a helper function which has some built in intelligence
-  hdr.chanunit = ft_chanunit(hdr);
-end
-
 % ensure that the output grad is according to the latest definition
 if isfield(hdr, 'grad')
   hdr.grad = ft_datatype_sens(hdr.grad);
@@ -2851,6 +2857,16 @@ if isfield(hdr, 'opto')
     % the NIRS optode structure is incomplete when reading/converting it from Homer files
     ft_warning('optode structure is not compliant with FT_DATATYPE_SENS');
   end
+end
+
+if ~isfield(hdr, 'chantype') && checkUniqueLabels
+  % use a helper function which has some built in intelligence
+  hdr.chantype = ft_chantype(hdr);
+end
+
+if ~isfield(hdr, 'chanunit') && checkUniqueLabels
+  % use a helper function which has some built in intelligence
+  hdr.chanunit = ft_chanunit(hdr);
 end
 
 if (strcmp(readbids, 'yes') || strcmp(readbids, 'ifmakessense')) && isbids

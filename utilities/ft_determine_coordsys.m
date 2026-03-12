@@ -27,7 +27,7 @@ function [data] = ft_determine_coordsys(data, varargin)
 % coordinate system, you should press the corresponding keyboard button.
 %
 % Recognized and supported coordinate systems are 'ctf', 'bti', '4d', 'yokogawa',
-% 'eeglab', 'neuromag', 'itab', 'acpc', 'spm', 'mni', 'fsaverage', 'tal', 'scanras',
+% 'eeglab', 'eeglab-hj', 'neuromag', 'itab', 'acpc', 'spm', 'mni', 'fsaverage', 'tal', 'scanras',
 % 'scanlps', 'dicom'.
 %
 % Furthermore, supported coordinate systems that do not specify the origin are 'ras',
@@ -172,7 +172,7 @@ switch dtype
     ft_plot_headmodel(data);
     ft_headlight
 
-  case {'grad' 'elec' 'opto' 'sens'}
+  case {'elec', 'grad', 'opto', 'sens'}
     ft_plot_sens(data, 'label', 'label');
     ft_headlight
 

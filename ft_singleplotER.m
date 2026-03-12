@@ -36,6 +36,7 @@ function [cfg] = ft_singleplotER(cfg, varargin)
 %                       interactive plot when a selected area is clicked. multiple areas
 %                       can be selected by holding down the shift key.
 %   cfg.figure        = 'yes' or 'no', whether to open a new figure. You can also specify a figure handle from FIGURE, GCF or SUBPLOT. (default = 'yes')
+%   cfg.figurename    = string, title of the figure window
 %   cfg.position      = location and size of the figure, specified as [left bottom width height] (default is automatic)
 %   cfg.renderer      = string, 'opengl', 'zbuffer', 'painters', see RENDERERINFO (default is automatic, try 'painters' when it crashes)
 %   cfg.linestyle     = linestyle/marker type, see options of the PLOT function (default = '-')
@@ -179,6 +180,9 @@ cfg.fontsize        = ft_getopt(cfg, 'fontsize',       8);
 cfg.interpreter     = ft_getopt(cfg, 'interpreter',   'none');  % none, tex or latex
 cfg.hotkeys         = ft_getopt(cfg, 'hotkeys',       'yes');
 cfg.interactive     = ft_getopt(cfg, 'interactive',   'yes');
+cfg.interactivecolor = ft_getopt(cfg, 'interactivecolor', [0 0 0]); % linecolor of selection rectangle
+cfg.interactivestyle = ft_getopt(cfg, 'interactivestyle', '--');    % linestyle of selection rectangle
+cfg.interactivewidth = ft_getopt(cfg, 'interactivewidth', 1.5);     % linewidth of selection rectangle
 cfg.maskparameter   = ft_getopt(cfg, 'maskparameter',  []);
 cfg.colorgroups     = ft_getopt(cfg, 'colorgroups',   'condition'); % this is the only supported option
 cfg.linecolor       = ft_getopt(cfg, 'linecolor',     []);
@@ -547,7 +551,7 @@ end
 if ~isempty(cfg.title)
   t = cfg.title;
 else
-  if length(cfg.channel) == 1
+  if isscalar(cfg.channel)
     t = [char(cfg.channel) ' / ' num2str(selchan) ];
   else
     t = sprintf('mean(%0s)', join_str(', ', cfg.channel));
@@ -584,9 +588,10 @@ if strcmp(cfg.interactive, 'yes')
     info.(ident).linecolor   = linecolor;
   end
   guidata(gcf, info);
-  set(gcf, 'windowbuttonupfcn',     {@ft_select_range, 'multiple', false, 'yrange', false, 'callback', {@select_topoplotER}, 'event', 'windowbuttonupfcn'});
-  set(gcf, 'windowbuttondownfcn',   {@ft_select_range, 'multiple', false, 'yrange', false, 'callback', {@select_topoplotER}, 'event', 'windowbuttondownfcn'});
-  set(gcf, 'windowbuttonmotionfcn', {@ft_select_range, 'multiple', false, 'yrange', false, 'callback', {@select_topoplotER}, 'event', 'windowbuttonmotionfcn'});
+  cb_options = {'multiple', false, 'yrange', false, 'callback', {@select_topoplotER}, 'linecolor', cfg.interactivecolor, 'linestyle', cfg.interactivestyle, 'linewidth', cfg.interactivewidth};
+  set(gcf, 'WindowButtonUpFcn',     [{@ft_select_range, 'event', 'WindowButtonUpFcn'}      cb_options]);
+  set(gcf, 'WindowButtonDownFcn',   [{@ft_select_range, 'event', 'WindowButtonDownFcn'},   cb_options]);
+  set(gcf, 'WindowButtonMotionFcn', [{@ft_select_range, 'event', 'WindowButtonMotionFcn'}, cb_options]);
 end
 
 % do the general cleanup and bookkeeping at the end of the function
